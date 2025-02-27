@@ -4,19 +4,20 @@
 \alias{spuDist}
 \title{CBM-CFS3 Spatial Unit Disturbances}
 \usage{
-spuDist(spuIDs, dbPath, localeID = 1)
+spuDist(dbPath, spuIDs = NULL, localeID = 1)
 }
 \arguments{
-\item{spuIDs}{Spatial unit ID(s)}
-
 \item{dbPath}{Path to CBM-CFS3 SQLite database file}
+
+\item{spuIDs}{Optional. Subset by spatial unit ID(s)}
 
 \item{localeID}{CBM-CFS3 locale_id}
 }
 \value{
-\code{data.table} with columns
-'spatial_unit_id', 'disturbance_type_id', 'disturbance_matrix_id',
-'name', 'description'
+\code{data.table} with 'disturbance_type_tr' columns
+"spatial_unit_id", "disturbance_type_id", "name", "description"
+and 'disturbance_matrix_association' columns
+"spatial_unit_id" and "disturbance_matrix_id"
 }
 \description{
 Identify the disturbances possible in spatial units.

@@ -80,7 +80,7 @@ spuDistMatch <- function(distTable, ask = interactive(), nearMatches = TRUE,
         " disturbance matches found for spatial_unit_id ", spuID, " ",
         "and disturbance name ", shQuote(distName), ". ",
         "Try rerunning with ask = TRUE ",
-        "or use the listDist function to review disturbance options.")
+        "or use the spuDist function to review disturbance options.")
 
       distMatch[[i]] <- distMatches
 
@@ -141,7 +141,7 @@ spuDistMatch <- function(distTable, ask = interactive(), nearMatches = TRUE,
         "Disturbance match options not found ",
         "for spatial_unit_id ", spuID, " ",
         "and disturbance name ", shQuote(distName), ". ",
-        "Use the listDist function to review disturbance options.")
+        "Use the spuDist function to review disturbance options.")
 
       # Prompt user to subset matches by disturbance_type_id
       distMatches <- .spuDistMatchSelect(distMatches, "disturbance_type_id")
@@ -230,20 +230,20 @@ spuDistMatch <- function(distTable, ask = interactive(), nearMatches = TRUE,
 #'
 #' Identify the disturbances possible in spatial units.
 #'
-#' @param spuIDs Spatial unit ID(s)
 #' @param dbPath Path to CBM-CFS3 SQLite database file
+#' @param spuIDs Optional. Subset by spatial unit ID(s)
 #' @param localeID CBM-CFS3 locale_id
 #'
-#' @return \code{data.table} with columns
-#' 'spatial_unit_id', 'disturbance_type_id', 'disturbance_matrix_id',
-#' 'name', 'description'
+#' @return \code{data.table} with 'disturbance_type_tr' columns
+#' "spatial_unit_id", "disturbance_type_id", "name", "description"
+#' and 'disturbance_matrix_association' columns
+#' "spatial_unit_id" and "disturbance_matrix_id"
 #'
 #' @export
 #' @importFrom data.table data.table
 #' @importFrom RSQLite dbConnect dbDisconnect dbDriver dbListTables dbReadTable
-spuDist <- function(spuIDs, dbPath, localeID = 1) {
+spuDist <- function(dbPath, spuIDs = NULL, localeID = 1) {
 
-  if (length(spuIDs) <  1) stop("length(spuIDs) must be >= 1")
   if (length(dbPath) != 1) stop("length(dbPath) must be == 1")
 
   # Connect to database
@@ -253,37 +253,19 @@ spuDist <- function(spuIDs, dbPath, localeID = 1) {
   # Read database tables
   ## Read more about the 6 tables related to disturbance matrices here:
   ## https://docs.google.com/spreadsheets/d/1TFBQiRH4z54l8ROX1N02OOiCHXMe20GSaExiuUqsC0Q
-  cbmTableNames <- c(
-    "disturbance_type", "disturbance_type_tr",
-    "disturbance_matrix", "disturbance_matrix_tr", "disturbance_matrix_value",
-    "disturbance_matrix_association"
-  )
+  cbmTableNames <- c("disturbance_type_tr", "disturbance_matrix_association")
 
   cbmDB <- list()
   for (cbmTableName in cbmTableNames) {
     cbmDB[[cbmTableName]] <- dbReadTable(cbmDBcon, cbmTableName) |> data.table()
   }
 
-  # match spuIDs with the disturbance_matrix_association table which has spu,
-  # disturbance_type_id and disturbance_matrix_id
-  dist_matrix_assoc <- unique(subset(cbmDB[["disturbance_matrix_association"]], spatial_unit_id %in% spuIDs))
+  # Merge and return
+  spuDist <- cbmDB[["disturbance_matrix_association"]][
+    subset(cbmDB[["disturbance_type_tr"]], locale_id == localeID),
+    on = .(disturbance_type_id = disturbance_type_id), nomatch = NULL]
 
-  # disturbance_type_id is a more generic ID with general names.
-  dist_type_name <- subset(
-    cbmDB[["disturbance_type_tr"]], locale_id == localeID
-  )[,.(disturbance_type_id, name)]
-
-  # disturbance_matrix_id is region specific IDs and has specific descriptions.
-  dist_matrix_desc <- subset(
-    cbmDB[["disturbance_matrix_tr"]], locale_id == localeID
-  )[,.(disturbance_matrix_id, description)]
-
-  # add the names and descriptions and return all the disturbance_type_id and
-  # disturbance_matrix_id that are associated with the provided spatial_unit_id
-  # (spu).
-  spuDist <- dist_matrix_assoc |>
-    merge(dist_type_name,   by = "disturbance_type_id") |>
-    merge(dist_matrix_desc, by = "disturbance_matrix_id")
+  if (!is.null(spuIDs)) spuDist <- subset(spuDist, spatial_unit_id %in% spuIDs)
 
   return(
     spuDist[,.(
@@ -324,6 +306,8 @@ spuDist <- function(spuIDs, dbPath, localeID = 1) {
 #'
 #' @export
 histDist <- function(spuIDs, dbPath = NULL, localeID = 1, listDist = NULL, ask = FALSE) {
+
+  if (length(spuIDs) < 1) stop("length(spuIDs) must be >= 1")
 
   # Set disturbance name matches
   histDistName <- list(`1` = "Wildfire")
