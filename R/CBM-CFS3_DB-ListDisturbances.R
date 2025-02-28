@@ -49,7 +49,7 @@ spuDistMatch <- function(distTable, ask = interactive(), nearMatches = TRUE,
     listDist <- spuDist(spuIDs = distTable$spatial_unit_id, dbPath = dbPath, localeID = localeID)
 
   }else{
-    reqCols <- c("spatial_unit_id", "disturbance_type_id", "disturbance_matrix_id", "name", "description")
+    reqCols <- c("spatial_unit_id", "disturbance_type_id", "name", "description")
     if (!all(reqCols %in% names(listDist))) stop(
       "listDist' must have the following columns: ",
       paste(shQuote(reqCols), collapse = ", "))
@@ -89,7 +89,9 @@ spuDistMatch <- function(distTable, ask = interactive(), nearMatches = TRUE,
       # Helper function: prompt user to choose a match
       .spuDistMatchSelect <- function(distMatches, chooseID = "disturbance_type_id"){
 
-        printTable <- distMatches[, .(disturbance_type_id, disturbance_matrix_id, name, description)]
+        printTable <- distMatches[, intersect(
+          c("disturbance_type_id", "sw_hw", "disturbance_matrix_id", "name", "description"),
+          names(distMatches)), with = FALSE]
 
         repeat{
 
@@ -103,7 +105,7 @@ spuDistMatch <- function(distTable, ask = interactive(), nearMatches = TRUE,
             }),
             "",
             "CBM-CFS3 disturbance(s) with a matching name or description:",
-            knitr::kable(printTable[,1:3], format = "pipe"),
+            knitr::kable(printTable[, setdiff(names(printTable), "description"), with = FALSE], format = "pipe"),
             "",
             crayon::yellow(
               "Enter the correct", chooseID,
@@ -147,7 +149,7 @@ spuDistMatch <- function(distTable, ask = interactive(), nearMatches = TRUE,
       distMatches <- .spuDistMatchSelect(distMatches, "disturbance_type_id")
 
       # Prompt user to subset matches by disturbance_matrix_id
-      if (nrow(distMatches) > 1){
+      if ("disturbance_matrix_id" %in% names(distMatches) && nrow(distMatches) > 1){
         distMatches <- .spuDistMatchSelect(distMatches, "disturbance_matrix_id")
       }
 
@@ -278,10 +280,10 @@ spuDist <- function(dbPath, spuIDs = NULL, localeID = 1,
   if (!is.null(spuIDs)) spuDist <- subset(spuDist, spatial_unit_id %in% spuIDs)
 
   return(
-    spuDist[,.(
-      spatial_unit_id, disturbance_type_id, disturbance_matrix_id,
-      name, description
-    )]
+    spuDist[, intersect(
+      c("spatial_unit_id", "disturbance_type_id", "sw_hw", "disturbance_matrix_id", "name", "description"),
+      names(spuDist)),
+      with = FALSE]
   )
 }
 
