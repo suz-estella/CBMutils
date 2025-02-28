@@ -233,6 +233,9 @@ spuDistMatch <- function(distTable, ask = interactive(), nearMatches = TRUE,
 #' @param dbPath Path to CBM-CFS3 SQLite database file
 #' @param spuIDs Optional. Subset by spatial unit ID(s)
 #' @param localeID CBM-CFS3 locale_id
+#' @param disturbance_matrix_association data.frame. Optional.
+#' Alternative disturbance_matrix_association table with columns
+#' "spatial_unit_id", "disturbance_type_id", and "disturbance_matrix_id".
 #'
 #' @return \code{data.table} with 'disturbance_type_tr' columns
 #' "spatial_unit_id", "disturbance_type_id", "name", "description"
@@ -242,7 +245,8 @@ spuDistMatch <- function(distTable, ask = interactive(), nearMatches = TRUE,
 #' @export
 #' @importFrom data.table data.table
 #' @importFrom RSQLite dbConnect dbDisconnect dbDriver dbListTables dbReadTable
-spuDist <- function(dbPath, spuIDs = NULL, localeID = 1) {
+spuDist <- function(dbPath, spuIDs = NULL, localeID = 1,
+                    disturbance_matrix_association = NULL) {
 
   if (length(dbPath) != 1) stop("length(dbPath) must be == 1")
 
@@ -253,11 +257,17 @@ spuDist <- function(dbPath, spuIDs = NULL, localeID = 1) {
   # Read database tables
   ## Read more about the 6 tables related to disturbance matrices here:
   ## https://docs.google.com/spreadsheets/d/1TFBQiRH4z54l8ROX1N02OOiCHXMe20GSaExiuUqsC0Q
-  cbmTableNames <- c("disturbance_type_tr", "disturbance_matrix_association")
+  cbmTableNames <- c(
+    "disturbance_type_tr",
+    if (is.null(disturbance_matrix_association)) "disturbance_matrix_association")
 
   cbmDB <- list()
   for (cbmTableName in cbmTableNames) {
     cbmDB[[cbmTableName]] <- dbReadTable(cbmDBcon, cbmTableName) |> data.table()
+  }
+
+  if (!is.null(disturbance_matrix_association)){
+    cbmDB[["disturbance_matrix_association"]] <- disturbance_matrix_association
   }
 
   # Merge and return

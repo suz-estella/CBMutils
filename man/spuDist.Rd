@@ -4,7 +4,12 @@
 \alias{spuDist}
 \title{CBM-CFS3 Spatial Unit Disturbances}
 \usage{
-spuDist(dbPath, spuIDs = NULL, localeID = 1)
+spuDist(
+  dbPath,
+  spuIDs = NULL,
+  localeID = 1,
+  disturbance_matrix_association = NULL
+)
 }
 \arguments{
 \item{dbPath}{Path to CBM-CFS3 SQLite database file}
@@ -12,6 +17,10 @@ spuDist(dbPath, spuIDs = NULL, localeID = 1)
 \item{spuIDs}{Optional. Subset by spatial unit ID(s)}
 
 \item{localeID}{CBM-CFS3 locale_id}
+
+\item{disturbance_matrix_association}{data.frame. Optional.
+Alternative disturbance_matrix_association table with columns
+"spatial_unit_id", "disturbance_type_id", and "disturbance_matrix_id".}
 }
 \value{
 \code{data.table} with 'disturbance_type_tr' columns
