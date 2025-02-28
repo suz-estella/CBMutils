@@ -267,7 +267,7 @@ spuDist <- function(dbPath, spuIDs = NULL, localeID = 1,
   }
 
   if (!is.null(disturbance_matrix_association)){
-    cbmDB[["disturbance_matrix_association"]] <- disturbance_matrix_association
+    cbmDB[["disturbance_matrix_association"]] <- data.table(disturbance_matrix_association)
   }
 
   # Merge and return
