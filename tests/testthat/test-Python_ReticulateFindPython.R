@@ -11,7 +11,7 @@ test_that("ReticulateFindPython", {
     version = "3.10", pyenvRoot = pyenvRoot,
     pyenvOnly = TRUE, useGit = FALSE, prompt = FALSE)
 
-  stop(pyExe)
+  stop(pyEXE)
 
   expect_equal(length(pyEXE), 1)
   expect_true(file.exists(pyEXE))
