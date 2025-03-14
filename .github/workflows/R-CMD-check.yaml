@@ -9,6 +9,7 @@ on:
       - main
       - master
       - development
+      - reticulate
 
 name: R-CMD-check
 
