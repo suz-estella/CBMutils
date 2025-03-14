@@ -16,7 +16,9 @@ test_that("ReticulateFindPython", {
   expect_true(tolower(tools::file_ext(pyEXE)) == "exe")
 
   # Check that Python was installed at pyeenvRoot
-  expect_true("ReticulateFindPython" %in% strsplit(normalizePath(pyEXE, winslash = "/"), "/")[[1]])
+  if (identical(.Platform$OS.type, "windows")){
+    expect_true("ReticulateFindPython" %in% strsplit(normalizePath(pyEXE, winslash = "/"), "/")[[1]])
+  }
 
   # Check that re-running returns the same path
   pyEXE2 <- ReticulateFindPython(

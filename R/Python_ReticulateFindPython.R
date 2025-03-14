@@ -45,7 +45,7 @@ ReticulateFindPython <- function(version, versionInstall = version, useGit = TRU
   }
 
   # Return path to interpreter
-  reticulate_python_exe_path(version, pyenvRoot = pyenvRoot)
+  reticulate_python_exe_path(version, pyenvRoot = pyenvRoot, pyenvOnly = pyenvOnly)
 }
 
 #' Python EXE path
