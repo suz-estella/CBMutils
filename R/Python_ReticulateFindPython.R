@@ -86,7 +86,8 @@ reticulate_python_exe_path <- function(version = NULL,
 
   if (pyenvOnly & nrow(pyPaths) > 0){
     pyPaths <- pyPaths[sapply(pyPaths$path, function(path){
-      any(c("pyenv", "pyenv-win") %in% strsplit(normalizePath(path, winslash = "/"), "/")[[1]])
+      any(c(".pyenv", "pyenv", ".pyenv-win", "pyenv-win") %in%
+            strsplit(normalizePath(path, winslash = "/"), "/")[[1]])
     }),]
   }
 

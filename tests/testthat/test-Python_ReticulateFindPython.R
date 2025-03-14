@@ -11,7 +11,7 @@ test_that("ReticulateFindPython", {
     version = "3.10", pyenvRoot = pyenvRoot,
     pyenvOnly = TRUE, useGit = FALSE, prompt = FALSE)
 
-  stop(pyEXE)
+  cat("\n\n", pyEXE, "\n\n", sep =)
 
   expect_equal(length(pyEXE), 1)
   expect_true(file.exists(pyEXE))
@@ -28,6 +28,8 @@ test_that("ReticulateFindPython", {
     pyenvOnly = TRUE, useGit = FALSE, prompt = FALSE)
 
   expect_identical(pyEXE, pyEXE2)
+
+  cat("\n\n", pyEXE2, "\n\n", sep = "")
 
 })
 
