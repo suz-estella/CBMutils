@@ -178,21 +178,20 @@ dataPrep_disturbanceRastersURL <- function(
 
   }else{
 
-    checkSums <- as.data.frame(dlList$checkSums)
-    checkSums <- checkSums[apply(
-      checkSums[, names(checkSums)[grepl("^checksum", names(checkSums))], drop = FALSE],
-      1,
-      function(row) any("dir" %in% row)
-    ),, drop = FALSE]
-
-    if (nrow(checkSums) != 1) stop(
-      "URL did not retrieve an archive. ",
-      "If URL is a single raster file, provide the 'bandYears' argument.")
-
-    archiveDir   <- file.path(dlList$destinationPath, na.omit(c(checkSums$actualFile, checkSums$expectedFile))[1])
-    archiveFiles <- list.files(dirname(dlList$targetFilePath), full.names = TRUE)
+    # Check if target file is an extracted archive
+    if (file.info(dlList$targetFilePath)$isdir){
+      archiveDir <- dlList$targetFilePath
+    }else if (dirname(dlList$targetFilePath) != dlList$destinationPath){
+      archiveDir <- dirname(dlList$targetFilePath)
+      while (dirname(archiveDir) != dlList$destinationPath){
+        archiveDir <- dirname(archiveDir)
+      }
+    }else stop("URL did not retrieve an archive. ",
+               "If URL is a single raster file, provide the 'bandYears' argument.")
 
     # List files by year
+    archiveFiles <- list.files(archiveDir, recursive = TRUE, full.names = TRUE)
+
     dlInfo <- data.frame(
       path = archiveFiles,
       name = tools::file_path_sans_ext(basename(archiveFiles)),
