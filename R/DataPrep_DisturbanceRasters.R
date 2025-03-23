@@ -23,7 +23,7 @@
 #' @importFrom data.table data.table
 #' @importFrom exactextractr exact_resample
 #' @importFrom reproducible Cache
-#' @importFrom terra rast
+#' @importFrom terra compareGeom rast
 #' @export
 dataPrep_disturbanceRasters <- function(
     disturbanceRastersList, templateRast = NULL, year = NULL){
@@ -90,9 +90,19 @@ dataPrep_disturbanceRasters <- function(
 
         # Align with template raster
         if (!is.null(templateRast)){
-          annualDist <- exactextractr::exact_resample(
-            annualDist, templateRast, fun = "mode"
-          ) |> Cache()
+
+          needsAlign <- !terra::compareGeom(
+            annualDist, templateRast,
+            lyrs = FALSE,
+            crs = TRUE, warncrs = FALSE,
+            ext = TRUE, rowcol = TRUE, res = TRUE,
+            stopOnError = FALSE, messages = FALSE)
+
+          if (needsAlign){
+            annualDist <- exactextractr::exact_resample(
+              annualDist, templateRast, fun = "mode"
+            ) |> Cache()
+          }
         }
 
         # Get raster values
