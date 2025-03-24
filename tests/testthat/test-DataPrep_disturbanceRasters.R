@@ -1,6 +1,11 @@
 
 if (!testthat::is_testing()) source(testthat::test_path("setup.R"))
 
+# Set URL to disturbance rasters ZIP archive
+## Raster test data is a subset of the Wulder and White disturbance rasters covering SK 1984-2011
+## TODO: update link to repo main or development branch
+disturbanceRastersURL <- "https://raw.githubusercontent.com/suz-estella/CBMutils/refs/heads/dataPrepDistRast/tests/testthat/testdata/SaskDist_1985-1857_crop.zip"
+
 # Set output path
 destinationPath <- file.path(testDirs$temp$outputs, "dataPrep_disturbanceRasters")
 dir.create(destinationPath)
@@ -10,19 +15,18 @@ test_that("dataPrep_disturbanceRastersURL", {
   # Test: archive file with 1 raster file per year
   disturbanceRasters <- dataPrep_disturbanceRastersURL(
     destinationPath       = destinationPath,
-    disturbanceRastersURL = "https://drive.google.com/file/d/12YnuQYytjcBej0_kdodLchPg7z9LygCt",
+    disturbanceRastersURL = disturbanceRastersURL,
   )
 
   expect_true(is.list(disturbanceRasters))
   expect_true(all(sapply(disturbanceRasters, class) == "SpatRaster"))
-  expect_identical(names(disturbanceRasters), as.character(1985:2011))
+  expect_identical(names(disturbanceRasters), as.character(1985:1987))
 
   # Test: single file with 1 raster band per year
   disturbanceRasters <- dataPrep_disturbanceRastersURL(
     destinationPath       = destinationPath,
-    disturbanceRastersURL = "https://drive.google.com/file/d/12YnuQYytjcBej0_kdodLchPg7z9LygCt",
-    targetFile            = "disturbance_testArea/SaskDist_1985.grd",
-    #alsoExtract           = "similar",
+    disturbanceRastersURL = disturbanceRastersURL,
+    targetFile            = "disturbance_testArea/SaskDist_1985_crop.tif",
     bandYears             = 1985
   )
 
@@ -34,149 +38,157 @@ test_that("dataPrep_disturbanceRastersURL", {
 
 test_that("dataPrep_disturbanceRasters", {
 
-  distRasters <- list(
-    bands = dataPrep_disturbanceRastersURL(
-      destinationPath       = destinationPath,
-      disturbanceRastersURL = "https://drive.google.com/file/d/12YnuQYytjcBej0_kdodLchPg7z9LygCt",
-      targetFile            = "disturbance_testArea/SaskDist_1985.grd",
-      #alsoExtract           = "similar",
-      bandYears             = 1985
+  # Read validation data
+  validEvents <- lapply(
+    list(
+      resampleSkip = file.path(destinationPath, "SaskDist_1985-1857_crop/SaskDist_1985-1987_crop_events.csv"),
+      resample10m  = file.path(destinationPath, "SaskDist_1985-1857_crop/SaskDist_1985_resample10m_events.csv"),
+      resample100m = file.path(destinationPath, "SaskDist_1985-1857_crop/SaskDist_1985_resample100m_events.csv")
     ),
-    files = dataPrep_disturbanceRastersURL(
-      destinationPath       = destinationPath,
-      disturbanceRastersURL = "https://drive.google.com/file/d/12YnuQYytjcBej0_kdodLchPg7z9LygCt",
-    )
+    function(csv) data.table::fread(csv, key = c("year", "eventID")) |> subset(eventID != 0)
   )
 
-  # Expect error: wrong input format
-  expect_error(dataPrep_disturbanceRasters(distRasters[["bands"]]), "list")
-  expect_error(dataPrep_disturbanceRasters(distRasters[["files"]]), "year")
-
-  # Test: single file with 1 raster band per year
-  disturbanceEvents <- dataPrep_disturbanceRasters(unname(distRasters["bands"]))
-
-  expect_true(inherits(disturbanceEvents, "data.table"))
-  for (colName in c("pixelIndex", "year", "eventID")){
-    expect_true(colName %in% names(disturbanceEvents))
-    expect_true(is.integer(disturbanceEvents[[colName]]))
-    expect_true(all(!is.na(disturbanceEvents[[colName]])))
+  # Read input rasters
+  disturbanceRastersList <- list(
+    files = lapply(
+      list(
+        "1985" = file.path(destinationPath, "SaskDist_1985-1857_crop/SaskDist_1985_crop.tif"),
+        "1986" = file.path(destinationPath, "SaskDist_1985-1857_crop/SaskDist_1986_crop.tif"),
+        "1987" = file.path(destinationPath, "SaskDist_1985-1857_crop/SaskDist_1987_crop.tif")
+      ),
+      terra::rast
+    ))
+  disturbanceRastersList[["bands"]] <- {
+    inRast <- disturbanceRastersList[["files"]]
+    rMerge <- c(inRast[[1]], inRast[[2]], inRast[[3]])
+    names(rMerge) <- names(inRast)
+    rMerge
   }
-  expect_equal(nrow(disturbanceEvents), 1857)
-  expect_setequal(unique(disturbanceEvents$eventID), c(1L, 2L, 3L, 5L))
-  expect_equal(sum(disturbanceEvents$pixelIndex), 4789432666)
-  expect_true(all(disturbanceEvents$year == 1985))
 
-  # Test: archive file with 1 raster file per year
-  disturbanceEvents <- dataPrep_disturbanceRasters(unname(distRasters["files"]))
+  # Expect error: not a list
+  expect_error(dataPrep_disturbanceRasters(disturbanceRastersList[["bands"]]))
 
-  expect_true(inherits(disturbanceEvents, "data.table"))
+  # Expect error: list items not names by disturbance year
+  expect_error(dataPrep_disturbanceRasters(disturbanceRastersList[["files"]]))
+  expect_error(dataPrep_disturbanceRasters({
+    input <- disturbanceRastersList["files"]
+    names(input[["files"]]) <- NULL
+    input
+  }))
+
+  # Test: single SpatRaster with 1 raster band per year
+  distEvents <- dataPrep_disturbanceRasters(unname(disturbanceRastersList["bands"]))
+
+  expect_true(inherits(distEvents, "data.table"))
   for (colName in c("pixelIndex", "year", "eventID")){
-    expect_true(colName %in% names(disturbanceEvents))
-    expect_true(is.integer(disturbanceEvents[[colName]]))
-    expect_true(all(!is.na(disturbanceEvents[[colName]])))
+    expect_true(colName %in% names(distEvents))
+    expect_true(is.integer(distEvents[[colName]]))
+    expect_true(all(!is.na(distEvents[[colName]])))
   }
-  expect_equal(nrow(disturbanceEvents), 295569)
-  expect_true(all(disturbanceEvents$eventID %in% c(1L:5L)))
 
-  distEventsByYear <- disturbanceEvents[, .(count = .N), by = year]
-  expect_equal(setNames(distEventsByYear$count, distEventsByYear$year), c(
-    `1985` =  1857, `1986` =  2364, `1987` =  7905, `1988` =   519, `1989` =   939,
-    `1990` =  2672, `1991` =  1280, `1992` =   906, `1993` = 23477, `1994` = 13725,
-    `1995` =  8672, `1996` =  2775, `1997` =  3269, `1998` = 42812, `1999` = 49568,
-    `2000` = 14790, `2001` =  8386, `2002` = 19817, `2003` = 12713, `2004` =  3920,
-    `2005` = 12289, `2006` = 30593, `2007` =  9060, `2008` =  3815, `2009` = 14146,
-    `2010` =  1329, `2011` =  1971
-  ))
+  ## Compare with validation table
+  expect_equal(
+    data.table::setkey(
+      distEvents[, .(count = .N), by = c("year", "eventID")],
+      year, eventID),
+    validEvents[["resampleSkip"]]
+  )
 
-  # Test: one raster or list of raster files for each disturbance type
-  disturbanceEvents <- dataPrep_disturbanceRasters(setNames(distRasters, c(2, 1)))
+  # Test: list of SpatRaster with one raster per year
+  distEvents <- dataPrep_disturbanceRasters(unname(disturbanceRastersList["files"]))
 
-  expect_true(inherits(disturbanceEvents, "data.table"))
+  expect_true(inherits(distEvents, "data.table"))
   for (colName in c("pixelIndex", "year", "eventID")){
-    expect_true(colName %in% names(disturbanceEvents))
-    expect_true(is.integer(disturbanceEvents[[colName]]))
-    expect_true(all(!is.na(disturbanceEvents[[colName]])))
+    expect_true(colName %in% names(distEvents))
+    expect_true(is.integer(distEvents[[colName]]))
+    expect_true(all(!is.na(distEvents[[colName]])))
   }
-  expect_equal(nrow(disturbanceEvents), 295569 + 1857)
-  expect_true(all(disturbanceEvents$eventID %in% c(1L:2L)))
 
-  distEventsByYear <- subset(disturbanceEvents, eventID == 1L)[, .(count = .N), by = year]
-  expect_equal(setNames(distEventsByYear$count, distEventsByYear$year), c(
-    `1985` =  1857, `1986` =  2364, `1987` =  7905, `1988` =   519, `1989` =   939,
-    `1990` =  2672, `1991` =  1280, `1992` =   906, `1993` = 23477, `1994` = 13725,
-    `1995` =  8672, `1996` =  2775, `1997` =  3269, `1998` = 42812, `1999` = 49568,
-    `2000` = 14790, `2001` =  8386, `2002` = 19817, `2003` = 12713, `2004` =  3920,
-    `2005` = 12289, `2006` = 30593, `2007` =  9060, `2008` =  3815, `2009` = 14146,
-    `2010` =  1329, `2011` =  1971
-  ))
+  ## Compare with validation table
+  expect_equal(
+    data.table::setkey(
+      distEvents[, .(count = .N), by = c("year", "eventID")],
+      year, eventID),
+    validEvents[["resampleSkip"]]
+  )
 
-  distEventsByYear <- subset(disturbanceEvents, eventID == 2L)[, .(count = .N), by = year]
-  expect_equal(setNames(distEventsByYear$count, distEventsByYear$year), c(`1985` = 1857))
+  # Test: multiple disturbanceRaster for each event type
+  disturbanceRastersListMulti <- list(
+    `1` = disturbanceRastersList[["bands"]],
+    `2` = list("1985" = disturbanceRastersList[["files"]][["1987"]])
+  )
 
-  # Test: subset by year
-  disturbanceEvents <- dataPrep_disturbanceRasters(setNames(distRasters, c(2, 1)), year = 1985)
+  distEventsMulti <- dataPrep_disturbanceRasters(disturbanceRastersListMulti)
 
-  expect_true(inherits(disturbanceEvents, "data.table"))
+  expect_true(inherits(distEventsMulti, "data.table"))
   for (colName in c("pixelIndex", "year", "eventID")){
-    expect_true(colName %in% names(disturbanceEvents))
-    expect_true(is.integer(disturbanceEvents[[colName]]))
-    expect_true(all(!is.na(disturbanceEvents[[colName]])))
+    expect_true(colName %in% names(distEventsMulti))
+    expect_true(is.integer(distEventsMulti[[colName]]))
+    expect_true(all(!is.na(distEventsMulti[[colName]])))
   }
-  expect_equal(nrow(disturbanceEvents), 1857 + 1857)
-  expect_true(all(disturbanceEvents$eventID %in% c(1L:2L)))
 
-  distEventsByYear <- subset(disturbanceEvents, eventID == 1L)[, .(count = .N), by = year]
-  expect_equal(setNames(distEventsByYear$count, distEventsByYear$year), c(`1985` = 1857))
+  ## Check that event ID matches the list IDs
+  expect_true(all(distEventsMulti$eventID %in% c(1, 2)))
 
-  distEventsByYear <- subset(disturbanceEvents, eventID == 2L)[, .(count = .N), by = year]
-  expect_equal(setNames(distEventsByYear$count, distEventsByYear$year), c(`1985` = 1857))
+  ## Compare with validation table
+  distEventsMultiSum <- data.table::setkey(
+    distEventsMulti[, .(count = .N), by = c("year", "eventID")],
+    year, eventID)
 
-  # Test: with template: archive file with 1 raster file per year
+  expect_equal(
+    subset(distEventsMultiSum, eventID == 1)[, .(year, count)],
+    validEvents[["resampleSkip"]][, .(count = sum(count)), by = year]
+  )
+  expect_equal(
+    subset(distEventsMultiSum, year == 1985 & eventID == 2)$count,
+    sum(subset(validEvents[["resampleSkip"]], year == 1987)$count)
+  )
 
-  ## upsample
-  disturbanceEvents <- dataPrep_disturbanceRasters(
-    disturbanceRasters = list(distRasters[["files"]][1]),
+  # Test: Summarize only a subset of years
+  expect_identical(
+    dataPrep_disturbanceRasters(disturbanceRastersListMulti, year = 1985),
+    subset(distEventsMulti, year == 1985)
+  )
+  expect_identical(
+    dataPrep_disturbanceRasters(disturbanceRastersListMulti, year = c(1985, 1987)),
+    subset(distEventsMulti, year %in% c(1985, 1987))
+  )
+
+  # Test: with raster template: upsample
+  distEvents10m <- dataPrep_disturbanceRasters(
+    disturbanceRasters = list(disturbanceRastersList[["files"]]["1985"]),
     templateRast       = terra::rast(
       res  = 10, vals = NA,
       xmin = -677500, xmax = -677500 + 10000,
       ymin =  704500, ymax =  704500 + 10000,
-      crs  = terra::crs(distRasters[["files"]][[1]])
+      crs  = "EPSG:3979"
     )
   )
 
-  expect_true(inherits(disturbanceEvents, "data.table"))
-  for (colName in c("pixelIndex", "year", "eventID")){
-    expect_true(colName %in% names(disturbanceEvents))
-    expect_true(is.integer(disturbanceEvents[[colName]]))
-    expect_true(all(!is.na(disturbanceEvents[[colName]])))
-  }
+  expect_equal(
+    data.table::setkey(
+      distEvents10m[, .(count = .N), by = c("year", "eventID")],
+      year, eventID),
+    validEvents[["resample10m"]]
+  )
 
-  distEventsByEvent <- disturbanceEvents[, .(count = .N), by = eventID]
-  data.table::setkey(distEventsByEvent, eventID)
-  expect_equal(setNames(distEventsByEvent$count, distEventsByEvent$eventID), c(
-    `2` = 1296,
-    `3` =  684,
-    `5` = 9441
-  ))
-
-  ## downsample
-  disturbanceEvents <- dataPrep_disturbanceRasters(
-    disturbanceRasters = list(distRasters[["files"]][1]),
+  # Test: with raster template: downsample
+  distEvents100m <- dataPrep_disturbanceRasters(
+    disturbanceRasters = list(disturbanceRastersList[["files"]]["1985"]),
     templateRast       = terra::rast(
       res  = 100, vals = NA,
       xmin = -677500, xmax = -677500 + 10000,
       ymin =  704500, ymax =  704500 + 10000,
-      crs  = terra::crs(distRasters[["files"]][[1]])
+      crs  = "EPSG:3979"
     )
   )
 
-  distEventsByEvent <- disturbanceEvents[, .(count = .N), by = eventID]
-  data.table::setkey(distEventsByEvent, eventID)
-  expect_equal(setNames(distEventsByEvent$count, distEventsByEvent$eventID), c(
-    `2` = 12,
-    `3` =  4,
-    `5` = 95
-  ))
+  expect_equal(
+    data.table::setkey(
+      distEvents100m[, .(count = .N), by = c("year", "eventID")],
+      year, eventID),
+    validEvents[["resample100m"]]
+  )
 })
 
 
