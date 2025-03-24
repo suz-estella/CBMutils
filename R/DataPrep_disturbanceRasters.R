@@ -99,8 +99,11 @@ dataPrep_disturbanceRasters <- function(
             stopOnError = FALSE, messages = FALSE)
 
           if (needsAlign){
+
+            # assumption: max is faster if values are not required
             annualDist <- exactextractr::exact_resample(
-              annualDist, templateRast, fun = "mode"
+              annualDist, templateRast,
+              fun = ifelse(is.null(names(disturbanceRastersList)), "mode", "max")
             ) |> Cache()
           }
         }
