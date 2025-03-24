@@ -9,6 +9,7 @@ on:
       - main
       - master
       - development
+      - dev-distRasters
 
 name: test-coverage
 
