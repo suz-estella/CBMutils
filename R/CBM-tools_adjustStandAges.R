@@ -81,7 +81,7 @@ adjustStandAges <- function(standAges, yearInput, yearOutput,
         agesTooHigh <- subset(prevEvent, age > ageCalc)[[ageKey]]
         if (length(agesTooHigh) > 0) warning(
           length(agesTooHigh),
-          " stand(s) with unexpectedly high age(s): previous disturbance event should have eliminated stand")
+          " stand(s) with unexpectedly high input age(s): previous disturbance event should have eliminated stand")
 
         rm(prevEvent)
       }
