@@ -33,21 +33,29 @@ utils::globalVariables(c(
 adjustStandAges <- function(standAges, yearInput, yearOutput,
                             disturbanceEvents = NULL, defaultAge = NULL, delay = NULL){
 
-  # Check standAges input
+  yearInput  <- as.integer(yearInput)
+  yearOutput <- as.integer(yearOutput)
+
   standAges <- data.table::as.data.table(standAges)
+  if (!"age" %in% names(standAges)){
+    if ("ages" %in% names(standAges)){
+      standAges$age <- standAges$ages
+    }else stop("'standAges' must have column 'age'")
+  }
+
+  # Set key column name
   ageKey <- setdiff(names(standAges), "age")[[1]]
-  if (!"age" %in% names(standAges)) stop("'standAges' must have column 'age'")
 
   # Adjust ages as if no disturbances
   ageAdjust <- copy(standAges)[, age := age + yearOutput - yearInput]
 
-  # Add delays to table
-  if (!is.null(delay)) ageAdjust$delay <- delay
-  if (!"delay" %in% names(ageAdjust)) ageAdjust$delay <- 0
-
-  if (!is.null(disturbanceEvents)){
+  if (yearInput != yearOutput & !is.null(disturbanceEvents)){
 
     disturbanceEvents <- data.table::as.data.table(disturbanceEvents)
+
+    # Add delays to table
+    if (!is.null(delay)) ageAdjust$delay <- delay
+    if (!"delay" %in% names(ageAdjust)) ageAdjust$delay <- 0
 
     if (!ageKey %in% names(disturbanceEvents)) stop("'disturbanceEvents' must have column '", ageKey, "'")
     if (!"year" %in% names(disturbanceEvents)) stop("'disturbanceEvents' must have column 'year'")
@@ -56,8 +64,9 @@ adjustStandAges <- function(standAges, yearInput, yearOutput,
     if (yearOutput < yearInput){
 
       prevEvent <- disturbanceEvents[
-        disturbanceEvents[[ageKey]] %in% standAges[[ageKey]] &
-          disturbanceEvents$year <= yearInput,]
+        disturbanceEvents[[ageKey]] %in% subset(ageAdjust, !is.na(age))[[ageKey]] &
+          disturbanceEvents$year <= yearInput,][
+            , c(ageKey, "year"), with = FALSE]
 
       if (nrow(prevEvent) > 0){
 
@@ -72,8 +81,7 @@ adjustStandAges <- function(standAges, yearInput, yearOutput,
         agesTooHigh <- subset(prevEvent, age > ageCalc)[[ageKey]]
         if (length(agesTooHigh) > 0) warning(
           length(agesTooHigh),
-          " stand(s) with unexpectedly high age(s) that does not reflect a reset to age 0 ",
-          "after a provided disturbance event")
+          " stand(s) with unexpectedly high age(s): previous disturbance event should have eliminated stand")
 
         rm(prevEvent)
       }
@@ -81,8 +89,9 @@ adjustStandAges <- function(standAges, yearInput, yearOutput,
 
     # Find the most recent disturbance before the year required
     lastEvent <- disturbanceEvents[
-      disturbanceEvents[[ageKey]] %in% standAges[[ageKey]] &
-        disturbanceEvents$year <= yearOutput,]
+      disturbanceEvents[[ageKey]] %in% subset(ageAdjust, !is.na(age))[[ageKey]] &
+        disturbanceEvents$year <= yearOutput,][
+          , c(ageKey, "year"), with = FALSE]
 
     if (nrow(lastEvent) > 0){
 
@@ -108,11 +117,13 @@ adjustStandAges <- function(standAges, yearInput, yearOutput,
   }
 
   # Replace negative ages with the default age before a disturbance
-  negAges <- (ageAdjust$age < 0) %in% TRUE
-  if (any(negAges)){
-    if (is.null(defaultAge)) stop(
-      "'defaultAge' required for stands with an adjusted age of <0")
-    ageAdjust$age[negAges] <- defaultAge
+  if (yearOutput < yearInput){
+    negAges <- (ageAdjust$age < 0) %in% TRUE
+    if (any(negAges)){
+      if (is.null(defaultAge)) stop(
+        "'defaultAge' required for stands with an adjusted age of <0")
+      ageAdjust$age[negAges] <- defaultAge
+    }
   }
 
   # Set key and return
