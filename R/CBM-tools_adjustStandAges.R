@@ -17,13 +17,14 @@ utils::globalVariables(c(
 #' @param disturbanceEvents data.table. Optional.
 #' Table of disturbance events with the ID column in \code{standAges}
 #' and another column 'year' of when the disturbance occurred.
-#' @param defaultAge integer. A default age for stands before the first disturbance.
-#' If \code{yearOutput} precedes \code{yearInput}, stands with ages
-#' lesser than the difference in these years may be calculated to have an age <0,
-#' suggesting that a disturbance must have had occurred when age == 0.
-#' if \code{disturbanceEvents} includes an event before this date,
-#' stand age will be calculated from this date.
-#' Otherwise, negative ages are replaced with \code{defaultAge}.
+#' @param defaultAge integer. A default age for stands is otherwise unknown.
+#' If \code{yearOutput} precedes \code{yearInput},
+#' the age cannot be calculated for stands that have disturbances between
+#' \code{yearOutput} and \code{yearInput} but none before \code{yearOutput}.
+#' \code{defaultAge} will be assigned in these cases.
+#' NOTE: if a stand has an age lesser than the difference in these years,
+#' it is assumed that a disturbance event must have occurred when age == 0.
+#' \code{defaultAge} will be assigned in these cases.
 #' @param delay integer. Optional. Regeneration delay after a disturbance event.
 #'
 #' @return \code{standAges} with ages adjusted to \code{yearOutput}.
