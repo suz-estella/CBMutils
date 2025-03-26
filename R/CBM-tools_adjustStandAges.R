@@ -52,28 +52,31 @@ adjustStandAges <- function(standAges, yearInput, yearOutput,
     if (!ageKey %in% names(disturbanceEvents)) stop("'disturbanceEvents' must have column '", ageKey, "'")
     if (!"year" %in% names(disturbanceEvents)) stop("'disturbanceEvents' must have column 'year'")
 
-    # Check that the disturbances match the input stand ages
-    prevEvent <- disturbanceEvents[
-      disturbanceEvents[[ageKey]] %in% standAges[[ageKey]] &
-        disturbanceEvents$year <= yearInput,]
+    # Warn if the input ages don't match the disturbance events
+    if (yearOutput < yearInput){
 
-    if (nrow(prevEvent) > 0){
+      prevEvent <- disturbanceEvents[
+        disturbanceEvents[[ageKey]] %in% standAges[[ageKey]] &
+          disturbanceEvents$year <= yearInput,]
 
-      prevEvent <- unique(prevEvent[, year := max(year), by = ageKey])
-      prevEvent$ageCalc <- yearInput - prevEvent$year
+      if (nrow(prevEvent) > 0){
 
-      prevEvent <- merge(
-        prevEvent,
-        standAges[, c(ageKey, "age"), with = FALSE],
-        by = ageKey, all.x = TRUE)
+        prevEvent <- unique(prevEvent[, year := max(year), by = ageKey])
+        prevEvent$ageCalc <- yearInput - prevEvent$year
 
-      agesTooHigh <- subset(prevEvent, age > ageCalc)[[ageKey]]
-      if (length(agesTooHigh) > 0) warning(
-        length(agesTooHigh),
-        " stand(s) with unexpectedly high age(s) that does not reflect a reset to age 0 ",
-        "after a provided disturbance event")
+        prevEvent <- merge(
+          prevEvent,
+          standAges[, c(ageKey, "age"), with = FALSE],
+          by = ageKey, all.x = TRUE)
 
-      rm(prevEvent)
+        agesTooHigh <- subset(prevEvent, age > ageCalc)[[ageKey]]
+        if (length(agesTooHigh) > 0) warning(
+          length(agesTooHigh),
+          " stand(s) with unexpectedly high age(s) that does not reflect a reset to age 0 ",
+          "after a provided disturbance event")
+
+        rm(prevEvent)
+      }
     }
 
     # Find the most recent disturbance before the year required
