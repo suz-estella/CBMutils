@@ -12,31 +12,40 @@ utils::globalVariables(c(
 #' with an ID column and the numeric columns 'age'.
 #' Optionally include a 'delay' column with regeneration delays for each stand.
 #' A standard delay can also be provided with the \code{delay} argument.
+#' Optionally include a 'default' column with the default age for the stand
+#' if it cannot be otherwise calculated.
+#' A default age can also be provided with the \code{default} argument.
 #' @param yearInput integer. The year that the 'ages' column in \code{standAges} represents.
 #' @param yearOutput integer. The year that stand ages must be adjusted to.
 #' @param disturbanceEvents data.table. Optional.
 #' Table of disturbance events with the ID column in \code{standAges}
 #' and another column 'year' of when the disturbance occurred.
-#' @param defaultAge integer. A default age for stands is otherwise unknown.
+#' @param delay integer. Optional. Regeneration delay after a disturbance event.
+#' @param default integer. A default age for stands is otherwise unknown.
 #' If \code{yearOutput} precedes \code{yearInput},
 #' the age cannot be calculated for stands that have disturbances between
 #' \code{yearOutput} and \code{yearInput} but none before \code{yearOutput}.
-#' \code{defaultAge} will be assigned in these cases.
+#' \code{default} will be assigned in these cases.
 #' NOTE: if a stand has an age lesser than the difference in these years,
 #' it is assumed that a disturbance event must have occurred when age == 0.
-#' \code{defaultAge} will be assigned in these cases.
-#' @param delay integer. Optional. Regeneration delay after a disturbance event.
+#' \code{default} will be assigned in these cases.
+#' @param warn logical. Warn if ages cannot be calculated
+#' or if the provided disturbances do not match the input data.
 #'
 #' @return \code{standAges} with ages adjusted to \code{yearOutput}.
 #'
-#' @importFrom data.table as.data.table setkeyv
+#' @importFrom data.table as.data.table key setkeyv
 #' @export
-adjustStandAges <- function(standAges, yearInput, yearOutput,
-                            disturbanceEvents = NULL, defaultAge = NULL, delay = NULL){
+adjustStandAges <- function(standAges, yearInput, yearOutput, disturbanceEvents = NULL,
+                            delay = NULL, default = NULL, warn = TRUE){
 
   yearInput  <- as.integer(yearInput)
   yearOutput <- as.integer(yearOutput)
 
+  if (length(yearInput)  != 1) stop("'yearInput' must be length 1")
+  if (length(yearOutput) != 1) stop("'yearOutput' must be length 1")
+
+  # Read input ages
   standAges <- data.table::as.data.table(standAges)
   if (!"age" %in% names(standAges)){
     if ("ages" %in% names(standAges)){
@@ -44,92 +53,165 @@ adjustStandAges <- function(standAges, yearInput, yearOutput,
     }else stop("'standAges' must have column 'age'")
   }
 
-  # Set key column name
-  ageKey <- setdiff(names(standAges), "age")[[1]]
+  ## Set table key
+  ageKey <- data.table::key(standAges)
+  if (is.null(ageKey)){
+    ageKey <- setdiff(names(standAges), "age")[[1]]
+    data.table::setkeyv(standAges, ageKey)
+  }
 
-  # Adjust ages as if no disturbances
-  ageAdjust <- copy(standAges)[, age := age + yearOutput - yearInput]
+  if (yearInput == yearOutput) return(standAges[, c(ageKey, "age"), with = FALSE])
 
-  if (yearInput != yearOutput & !is.null(disturbanceEvents)){
+  # Initiate table of adjusted ages
+  ageAdjust <- copy(subset(standAges, !is.na(age)))[
+    , intersect(names(standAges), c(ageKey, "age", "default", "delay")), with = FALSE]
+  names(ageAdjust)[[1]] <- "id"
 
-    disturbanceEvents <- data.table::as.data.table(disturbanceEvents)
-
-    # Add delays to table
+  # Add delays to input table
+  if (!is.null(disturbanceEvents)){
     if (!is.null(delay)) ageAdjust$delay <- delay
     if (!"delay" %in% names(ageAdjust)) ageAdjust$delay <- 0
+  }
 
+  # Add default age to input table
+  if (!is.null(default)) ageAdjust$default <- default
+  if (!"default" %in% names(ageAdjust)) ageAdjust$default <- NA_integer_
+
+  # Adjust ages as if no disturbances
+  ageAdjust[, age := age + yearOutput - yearInput]
+
+  if (!is.null(disturbanceEvents)){
+
+    # Read disturbance events
+    disturbanceEvents <- data.table::as.data.table(disturbanceEvents)
     if (!ageKey %in% names(disturbanceEvents)) stop("'disturbanceEvents' must have column '", ageKey, "'")
     if (!"year" %in% names(disturbanceEvents)) stop("'disturbanceEvents' must have column 'year'")
 
-    # Warn if the input ages don't match the disturbance events
-    if (yearOutput < yearInput){
+    # Filter disturbance events by relevant IDs
+    if (ageKey != "id") disturbanceEvents$id <- disturbanceEvents[[ageKey]]
+    disturbanceEvents <- disturbanceEvents[id %in% ageAdjust$id,]
 
-      prevEvent <- disturbanceEvents[
-        disturbanceEvents[[ageKey]] %in% subset(ageAdjust, !is.na(age))[[ageKey]] &
-          disturbanceEvents$year <= yearInput,][
-            , c(ageKey, "year"), with = FALSE]
+    if (yearOutput > yearInput){
 
-      if (nrow(prevEvent) > 0){
+      # Find the most recent disturbance before the year required
+      lastEvent <- disturbanceEvents[year %in% yearInput:(yearOutput - 1), ][, .(id, year)]
 
-        prevEvent <- unique(prevEvent[, year := max(year), by = ageKey])
-        prevEvent$ageCalc <- yearInput - prevEvent$year
+      if (nrow(lastEvent) > 0){
 
-        prevEvent <- merge(
-          prevEvent,
-          standAges[, c(ageKey, "age"), with = FALSE],
-          by = ageKey, all.x = TRUE)
+        lastEvent <- unique(lastEvent[, year := max(year), by = "id"])
 
-        agesTooHigh <- subset(prevEvent, age > ageCalc)[[ageKey]]
-        if (length(agesTooHigh) > 0) warning(
-          length(agesTooHigh),
-          " stand(s) with unexpectedly high input age(s): previous disturbance event should have eliminated stand")
+        # Add delays to table
+        lastEvent <- merge(lastEvent, ageAdjust[, .(id, delay)], by = "id", all.x = TRUE)
 
-        rm(prevEvent)
+        # Calculate the age as the number of years after the disturbance
+        lastEvent[, age := yearOutput - (year + delay)]
+        lastEvent[age < 0, age := 0]
+
+        # Apply new ages
+        ageAdjust[match(lastEvent$id, ageAdjust$id), age := lastEvent$age]
+
+        rm(lastEvent)
       }
     }
 
-    # Find the most recent disturbance before the year required
-    lastEvent <- disturbanceEvents[
-      disturbanceEvents[[ageKey]] %in% subset(ageAdjust, !is.na(age))[[ageKey]] &
-        disturbanceEvents$year <= yearOutput,][
-          , c(ageKey, "year"), with = FALSE]
+    if (yearOutput < yearInput){
 
-    if (nrow(lastEvent) > 0){
+      # Determine which pixels were disturbed within time frame
+      firstEvent <- disturbanceEvents[year %in% yearOutput:(yearInput - 1),][, .(id, year)]
 
-      lastEvent <- unique(lastEvent[, year := max(year), by = ageKey])
+      # Add any pixels with negative ages in the table
+      ## This indicates that disturbance events are missing when age would == 0
+      ## Add a disturbance event at this time
+      negAges <- subset(ageAdjust, age < 0 & !id %in% firstEvent$id)
+      if (nrow(negAges) > 0){
 
-      # Add delays to table
-      lastEvent <- merge(
-        lastEvent,
-        ageAdjust[, c(ageKey, "delay"), with = FALSE],
-        by = ageKey, all.x = TRUE)
+        if (warn) warning(
+          nrow(negAges),
+          " stand(s) have ages indicating that disturbances are missing historical events.")
 
-      # Calculate the age as the number of years after the disturbance
-      lastEvent$age <- max(yearOutput - lastEvent$year - lastEvent$delay, 0)
+        negAges[, year := yearOutput - age]
 
-      # Apply new ages
-      ageAdjust <- rbind(
-        ageAdjust[!ageAdjust[[ageKey]] %in% lastEvent[[ageKey]],][, c(ageKey, "age"), with = FALSE],
-        lastEvent[, c(ageKey, "age"), with = FALSE]
-      )
+        firstEvent <- rbind(firstEvent, negAges[, .(id, year)])
+        rm(negAges)
+      }
 
-      rm(lastEvent)
+      if (nrow(firstEvent) > 0){
+
+        firstEvent <- unique(firstEvent[, year := min(year), by = "id"])
+
+        # Add delays to table
+        firstEvent <- merge(firstEvent, ageAdjust[, .(id, delay)], by = "id", all.x = TRUE)
+
+        # Find most recent event before year output
+        prevEvent <- disturbanceEvents[year <= yearOutput,][, .(id, year)]
+        if (nrow(prevEvent) > 0){
+
+          prevEvent <- unique(prevEvent[, prev := max(year), by = "id"])
+
+          firstEvent <- merge(firstEvent, prevEvent[, c(ageKey, "prev"), with = FALSE],
+                              by = "id", all.x = TRUE)
+          rm(prevEvent)
+
+        }else firstEvent$prev <- NA_real_
+
+        # Calculate age
+        firstEvent[, age := yearOutput - (prev + delay)]
+        firstEvent[age < 0, age := 0]
+
+        # Find pixels where a previous disturbance cannot be used to set age
+        ## Set age to -1 to be replaced later
+        firstEvent[is.na(age), age := -1]
+
+        # Apply new ages
+        ageAdjust[match(firstEvent$id, ageAdjust$id), age := firstEvent$age]
+      }
+
+      # Check that undisturbed stand ages match historical disturbance data
+      if (warn){
+
+        currEvent <- disturbanceEvents[year < yearInput & !id %in% firstEvent$id,]
+
+        if (nrow(currEvent) > 0){
+
+          # Find the most recent disturbance before the input year
+          currEvent <- unique(currEvent[, year := max(year), by = "id"])
+
+          # Calculate the age the stand "should" be
+          currEvent$ageDist <- yearInput - currEvent$year
+
+          # Compare with input ages
+          ageMismatch <- subset(
+            merge(currEvent, ageAdjust[, .(id, age)], on = "id", all.x = TRUE),
+            age > ageDist)
+
+          if (nrow(ageMismatch) > 0) warning(
+            nrow(ageMismatch),
+            " stand(s) with a high age as if survived a historical disturbance")
+        }
+        rm(currEvent)
+      }
+
+      rm(firstEvent)
     }
   }
 
-  # Replace negative ages with the default age before a disturbance
-  if (yearOutput < yearInput){
-    negAges <- (ageAdjust$age < 0) %in% TRUE
-    if (any(negAges)){
-      if (is.null(defaultAge)) stop(
-        "'defaultAge' required for stands with an adjusted age of <0")
-      ageAdjust$age[negAges] <- defaultAge
-    }
+  # Apply default age
+  if (yearOutput < yearInput && any(ageAdjust$age < 0)){
+
+    ageAdjust[age < 0, age := default]
+
+    if (warn && any(is.na(ageAdjust$age))) warning(
+      sum(is.na(ageAdjust$age)),
+      " stand(s) lost due to missing historical disturbances.")
   }
 
   # Set key and return
+  names(ageAdjust)[[1]] <- ageKey
+  ageAdjust <- rbind(
+    ageAdjust[, c(ageKey, "age"), with = FALSE],
+    standAges[is.na(age), c(ageKey, "age"), with = FALSE]
+  )
   data.table::setkeyv(ageAdjust, ageKey)
-  ageAdjust[, c(ageKey, "age"), with = FALSE]
-
+  ageAdjust
 }
 

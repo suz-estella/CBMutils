@@ -9,15 +9,19 @@ adjustStandAges(
   yearInput,
   yearOutput,
   disturbanceEvents = NULL,
-  defaultAge = NULL,
-  delay = NULL
+  delay = NULL,
+  default = NULL,
+  warn = TRUE
 )
 }
 \arguments{
 \item{standAges}{data.table. Table of stand ages
 with an ID column and the numeric columns 'age'.
 Optionally include a 'delay' column with regeneration delays for each stand.
-A standard delay can also be provided with the \code{delay} argument.}
+A standard delay can also be provided with the \code{delay} argument.
+Optionally include a 'default' column with the default age for the stand
+if it cannot be otherwise calculated.
+A default age can also be provided with the \code{default} argument.}
 
 \item{yearInput}{integer. The year that the 'ages' column in \code{standAges} represents.}
 
@@ -27,16 +31,19 @@ A standard delay can also be provided with the \code{delay} argument.}
 Table of disturbance events with the ID column in \code{standAges}
 and another column 'year' of when the disturbance occurred.}
 
-\item{defaultAge}{integer. A default age for stands is otherwise unknown.
+\item{delay}{integer. Optional. Regeneration delay after a disturbance event.}
+
+\item{default}{integer. A default age for stands is otherwise unknown.
 If \code{yearOutput} precedes \code{yearInput},
 the age cannot be calculated for stands that have disturbances between
 \code{yearOutput} and \code{yearInput} but none before \code{yearOutput}.
-\code{defaultAge} will be assigned in these cases.
+\code{default} will be assigned in these cases.
 NOTE: if a stand has an age lesser than the difference in these years,
 it is assumed that a disturbance event must have occurred when age == 0.
-\code{defaultAge} will be assigned in these cases.}
+\code{default} will be assigned in these cases.}
 
-\item{delay}{integer. Optional. Regeneration delay after a disturbance event.}
+\item{warn}{logical. Warn if ages cannot be calculated
+or if the provided disturbances do not match the input data.}
 }
 \value{
 \code{standAges} with ages adjusted to \code{yearOutput}.
