@@ -181,12 +181,12 @@ adjustStandAges <- function(standAges, yearInput, yearOutput, disturbanceEvents 
 
           # Compare with input ages
           ageMismatch <- subset(
-            merge(currEvent, ageAdjust[, .(id, age)], on = "id", all.x = TRUE),
+            merge(currEvent, ageAdjust[, .(id, age)], by = "id", all.x = TRUE),
             age > ageDist)
 
           if (nrow(ageMismatch) > 0) warning(
             nrow(ageMismatch),
-            " stand(s) with a high age as if survived a historical disturbance")
+            " stand(s) with age(s) too high to match historic disturbances")
         }
         rm(currEvent)
       }
@@ -214,4 +214,5 @@ adjustStandAges <- function(standAges, yearInput, yearOutput, disturbanceEvents 
   data.table::setkeyv(ageAdjust, ageKey)
   ageAdjust
 }
+
 
