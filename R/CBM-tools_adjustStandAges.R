@@ -119,15 +119,9 @@ adjustStandAges <- function(standAges, yearInput, yearOutput, disturbanceEvents 
       # Determine which pixels were disturbed within time frame
       firstEvent <- disturbanceEvents[year %in% yearOutput:(yearInput - 1),][, .(id, year)]
 
-      # Add any pixels with negative ages in the table
-      ## This indicates that disturbance events are missing when age would == 0
-      ## Add a disturbance event at this time
+      # Add events when stands were established
       negAges <- subset(ageAdjust, age < 0 & !id %in% firstEvent$id)
       if (nrow(negAges) > 0){
-
-        if (warn) warning(
-          nrow(negAges),
-          " stand(s) have ages indicating that disturbances are missing event(s) when age == 0.")
 
         negAges[, year := yearOutput - age]
 
