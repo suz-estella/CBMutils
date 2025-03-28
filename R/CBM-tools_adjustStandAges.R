@@ -20,6 +20,7 @@ utils::globalVariables(c(
 #' @param disturbanceEvents data.table. Optional.
 #' Table of disturbance events with the ID column in \code{standAges}
 #' and another column 'year' of when the disturbance occurred.
+#' This can also include rows for years that stands were first established.
 #' @param delay integer. Optional. Regeneration delay after a disturbance event.
 #' @param default integer. A default age for stands is otherwise unknown.
 #' If \code{yearOutput} precedes \code{yearInput},
@@ -75,7 +76,6 @@ adjustStandAges <- function(standAges, yearInput, yearOutput, disturbanceEvents 
 
   # Add default age to input table
   if (!is.null(default)) ageAdjust$default <- default
-  if (!"default" %in% names(ageAdjust)) ageAdjust$default <- NA_integer_
 
   # Adjust ages as if no disturbances
   ageAdjust[, age := age + yearOutput - yearInput]
@@ -127,7 +127,7 @@ adjustStandAges <- function(standAges, yearInput, yearOutput, disturbanceEvents 
 
         if (warn) warning(
           nrow(negAges),
-          " stand(s) have ages indicating that disturbances are missing historical events.")
+          " stand(s) have ages indicating that disturbances are missing event(s) when age == 0.")
 
         negAges[, year := yearOutput - age]
 
@@ -148,8 +148,7 @@ adjustStandAges <- function(standAges, yearInput, yearOutput, disturbanceEvents 
 
           prevEvent <- unique(prevEvent[, prev := max(year), by = "id"])
 
-          firstEvent <- merge(firstEvent, prevEvent[, c(ageKey, "prev"), with = FALSE],
-                              by = "id", all.x = TRUE)
+          firstEvent <- merge(firstEvent, prevEvent[, .(id, prev)], by = "id", all.x = TRUE)
           rm(prevEvent)
 
         }else firstEvent$prev <- NA_real_
@@ -198,11 +197,16 @@ adjustStandAges <- function(standAges, yearInput, yearOutput, disturbanceEvents 
   # Apply default age
   if (yearOutput < yearInput && any(ageAdjust$age < 0)){
 
-    ageAdjust[age < 0, age := default]
+    if ("default" %in% names(ageAdjust)){
 
-    if (warn && any(is.na(ageAdjust$age))) warning(
-      sum(is.na(ageAdjust$age)),
-      " stand(s) lost due to missing historical disturbances.")
+      ageAdjust[age < 0, age := default]
+
+    }else{
+
+      ageAdjust[age < 0, age := NA]
+
+      if (warn) warning(sum(is.na(ageAdjust$age)), " stand(s) lost due to missing historical events.")
+    }
   }
 
   # Set key and return

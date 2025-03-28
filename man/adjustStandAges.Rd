@@ -29,7 +29,8 @@ A default age can also be provided with the \code{default} argument.}
 
 \item{disturbanceEvents}{data.table. Optional.
 Table of disturbance events with the ID column in \code{standAges}
-and another column 'year' of when the disturbance occurred.}
+and another column 'year' of when the disturbance occurred.
+This can also include rows for years that stands were first established.}
 
 \item{delay}{integer. Optional. Regeneration delay after a disturbance event.}
 
