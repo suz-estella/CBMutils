@@ -47,6 +47,10 @@ jobs:
           r-version: ${{ matrix.config.r }}
           use-public-rspm: false
 
+      - name: Install terra
+        run: |
+          install.packages("terra")
+
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: |

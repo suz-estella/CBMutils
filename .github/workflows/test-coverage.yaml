@@ -4,7 +4,6 @@ on:
       - main
       - master
       - development
-      - testGHA
   pull_request:
     branches:
       - main
