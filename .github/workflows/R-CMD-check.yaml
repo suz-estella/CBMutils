@@ -54,7 +54,7 @@ jobs:
 
       - name: Install CBMutils
         run: |
-          install.packages("terra")
+          #install.packages("terra")
           install.packages("devtools")
           devtools::install_github("PredictiveEcology/CBMutils@development", upgrade = "never")
         shell: Rscript {0}
