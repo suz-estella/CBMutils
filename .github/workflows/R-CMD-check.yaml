@@ -55,7 +55,7 @@ jobs:
       - name: Install LandR
         run: |
           install.packages("devtools")
-          devtools::install_github("PredictiveEcology/LandR@development", upgrade = "never")
+          devtools::install_github("PredictiveEcology/LandR@development", upgrade = TRUE)
         shell: Rscript {0}
 
       - name: Install CBMutils
