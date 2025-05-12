@@ -52,6 +52,12 @@ jobs:
           extra-packages: |
             any::rcmdcheck
 
+      - name: Install LandR
+        run: |
+          install.packages("devtools")
+          devtools::install_github("PredictiveEcology/LandR@development", upgrade = "never")
+        shell: Rscript {0}
+
       - name: Install CBMutils
         run: |
           #install.packages("terra")
