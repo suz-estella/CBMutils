@@ -11,12 +11,12 @@ test_that("CBMsourcePrepInputs", {
   expect_equal(srcCBM$attr, "admin")
   expect_true("admin" %in% names(srcCBM$source))
 
-  ## Backup test: this source fails to download sometimes
-  # srcCBM <- CBMsourcePrepInputs("CanSIS-ecozone", inputPath = inputPath)
-  # expect_is(srcCBM, "list")
-  # expect_is(srcCBM$source, "sf")
-  # expect_equal(srcCBM$attr, "ecozone")
-  #  expect_true("ecozone" %in% names(srcCBM$source))
+  srcCBM <- CBMsourcePrepInputs("CanSIS-ecozone", inputPath = inputPath)
+  expect_is(srcCBM, "list")
+  expect_is(srcCBM$source, "sf")
+  expect_equal(srcCBM$attr, "ecozone")
+  expect_true("ecozone" %in% names(srcCBM$source))
+
 })
 
 test_that("CBMsourceExtractToRast", {
