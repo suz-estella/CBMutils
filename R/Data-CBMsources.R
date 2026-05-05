@@ -59,19 +59,42 @@ CBMsourcePrepInputs <- function(sourceID,
   srcUq <- unique(srcItems[, .SD, .SDcols = c("targetFile", "url")])
   srcUq$path <- sapply(1:nrow(srcUq), function(i){
 
-    reproducible::preProcess(
-      destinationPath = srcInfo$destinationPath,
-      url             = srcUq[i,]$url,
-      targetFile      = srcUq[i,]$targetFile,
-      filename1       = if (tools::file_ext(srcUq[i,]$url) == "zip" &
-                            tools::file_ext(srcUq[i,]$targetFile) != "zip") basename(srcUq[i,]$url),
-      archive         = if (tools::file_ext(srcUq[i,]$targetFile) %in% c("zip", "tar", "rar")) NA,
-      mode            = "wb",
-      alsoExtract     = "similar",
-      fun             = NA,
-      useCache        = FALSE,
-      ...
-    )$targetFilePath
+    if (tools::file_ext(srcUq[i,]$url) == "zip"){
+
+      # Issue with ZIP file corrupting on download
+      # Indications the file is incorrectly being downloaded as a text file
+      dir.create(srcInfo$destinationPath, recursive = TRUE, showWarnings = FALSE)
+      download.file(
+        srcUq[i,]$url,
+        file.path(srcInfo$destinationPath, basename(srcUq[i,]$url)),
+        mode = "wb", quiet = TRUE)
+
+      reproducible::prepInputs(
+        destinationPath = srcInfo$destinationPath,
+        targetFile      = srcUq[i,]$targetFile,
+        archive         = file.path(srcInfo$destinationPath, basename(srcUq[i,]$url)),
+        alsoExtract     = "similar",
+        fun             = NA,
+        useCache        = FALSE,
+        ...
+      )
+
+      file.path(srcInfo$destinationPath, srcUq[i,]$targetFile)
+
+
+    }else{
+
+      reproducible::preProcess(
+        destinationPath = srcInfo$destinationPath,
+        url             = srcUq[i,]$url,
+        targetFile      = srcUq[i,]$targetFile,
+        archive         = if (tools::file_ext(srcUq[i,]$targetFile) %in% c("zip", "tar", "rar")) NA,
+        alsoExtract     = "similar",
+        fun             = NA,
+        useCache        = FALSE,
+        ...
+      )$targetFilePath
+    }
   })
 
   # Read source
